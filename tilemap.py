@@ -2,6 +2,8 @@ import pygame
 from pygame import Rect
 import numpy as np
 from collections import defaultdict
+import xml.etree.ElementTree as ET
+import os
 
 class Tile:
     def __init__(self, size, offset):
@@ -47,14 +49,67 @@ class TilemapEditor:
         return Rect((0,0)+self.compact.get_size())
 
 
+class Map:
+    def __init__(self, tmx, tilemap):
+        tree = ET.parse(tmx)
+        root = tree.getroot()
+        self.tilemap = tilemap
+        self.width = int(root.attrib["width"])
+        self.height = int(root.attrib["height"])
+        self.tile_width = int(root.attrib["tilewidth"])
+        self.tile_height = int(root.attrib["tileheight"])
+        self.layers = len(root.findall("layer"))
+
+        print(self.tilemap.get_rect(1))
+
+        self.data = np.zeros((self.layers, self.width, self.height), dtype=np.int32)
+        for i, layer in enumerate(root.findall("layer")):
+            self.data[i, :, :] = np.fromstring(layer.find("data").text, sep=",", dtype=np.int32).reshape((self.height, self.width)).T
+
+        self.a = np.array([[self.tile_width, 0], [0, self.tile_height]])
+        self.ainv = np.linalg.inv(self.a)
+        self.positions = np.dot(self.a, np.indices((self.width, self.height)).reshape((2, self.width * self.height))).reshape((2, self.width, self.height))
+
+    def draw(self, surface, scroll):
+        for layer in range(0, self.layers):
+            for x in range(self.width)[::-1]:
+                for y in range(self.height):
+                    tile = self.data[layer, x, y]
+                    if tile == 0:
+                        continue
+                    surface.blit(self.tilemap.image,
+                                     dest=self.positions[:, x, y] + scroll - self.tilemap.get_offset(tile-1),
+                                     area=self.tilemap.get_rect(tile-1))
+
 class Tilemap:
-    def __init__(self, image, tile_count, tile_size, tile_offset, layers):
+    """def __init__(self, image, tile_count, tile_size, tile_offset, layers):
         self.image = image
         self.tile_count = tile_count
         self.tile_size = np.array(tile_size)
         self.tiles = defaultdict(lambda: Tile((1,1), tile_offset))
         self.layer_default_tile = defaultdict(lambda: 0)
-        self.layers = layers
+        self.layers = layers"""
+
+    def __init__(self, tsx):
+
+        tree = ET.parse(tsx)
+        root = tree.getroot()
+        print(root.attrib)
+        self.tile_count = (int(root.attrib["columns"]), int(root.attrib["tilecount"]) / int(root.attrib["columns"]))
+        self.tile_size = np.array([int(root.attrib["tilewidth"]), int(root.attrib["tileheight"])])
+        self.tiles = defaultdict(lambda: Tile((1, 1), (0, 0)))
+        self.layer_default_tile = defaultdict(lambda: 0)
+        self.layers = 10
+        directory = os.path.dirname(tsx)
+        for child in root:
+            tilemap_file = os.path.join(directory, child.attrib["source"])
+        self.image = pygame.image.load(tilemap_file)
+        """self.image = image
+        self.tile_count = tile_count
+        self.tile_size = np.array(tile_size)
+        self.tiles = defaultdict(lambda: Tile((1, 1), tile_offset))
+        self.layer_default_tile = defaultdict(lambda: 0)
+        self.layers = layers"""
 
     def setup_done(self):
         self.layer_tiles = dict()
@@ -78,7 +133,7 @@ class Tilemap:
         return tile%self.tile_count[0]
 
     def get_y(self, tile):
-        return tile/self.tile_count[0]
+        return int(tile/self.tile_count[0])
 
     def get_rect(self, tile):
         size = self.tile_size * self.tiles[tile].size
@@ -100,7 +155,9 @@ class Tilemap:
             if tile_nr in rng and not tile.disabled and tile.layer in layer
         ]
 
-tilemap = Tilemap(pygame.image.load("tilemap.png"), (10,16), (64,64), (32,32), 2)
+tilemap = Tilemap("assets/shinygold.tsx")
+
+"""tilemap = Tilemap(pygame.image.load("tilemap.png"), (10,16), (64,64), (32,32), 2)
 # make the right-most tiles oversized so that the empty tiles to the right get .disabled = True
 tilemap.add_special_tile(6, (3,1))
 tilemap.add_special_tile(17, (3,1))
@@ -123,4 +180,4 @@ for tile in tilemap.get_enabled_tiles(range(50,160)):
     tile.layer = 1
 tilemap.layer_default_tile[1] = 9
 tilemap.setup_done()
-
+"""
