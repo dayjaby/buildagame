@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 
 from pygame.locals import *
 
-from tilemap import tilemap, TilemapEditor, Map
+from tilemap import tilemap, Map
 #initialise the pygame module
 pygame.init()
 
@@ -16,6 +16,8 @@ map = Map("assets/mymap.tmx", tilemap)
 WIDTH, HEIGHT = SCREENSIZE = np.array((640,480))
 DISPLAYSURF = pygame.display.set_mode(SCREENSIZE)
 pygame.display.set_caption('My cool game')
+DRAW = 25
+pygame.time.set_timer(DRAW, 333)
 
 scroll = [200, 100]
 
@@ -34,6 +36,10 @@ while running:
             pass
         elif event.type == MOUSEBUTTONDOWN:
             pass
+        elif event.type == DRAW:
+            map.draw(DISPLAYSURF, scroll)
+            pygame.display.update()
+            DISPLAYSURF.fill((0,0,0))
 
     pressed = pygame.key.get_pressed()
     if pressed[K_LEFT] == 1:
@@ -41,11 +47,8 @@ while running:
     elif pressed[K_RIGHT] == 1:
         scroll[0]-=10
 
-    map.draw(DISPLAYSURF, scroll)
 
     #update the display
-    pygame.display.update()
-    DISPLAYSURF.fill((0,0,0))
 
 pygame.quit()
 sys.exit()
